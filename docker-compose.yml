@@ -1,0 +1,61 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-}
+      - discovery.type=single-node
+      - xpack.monitoring.collection.enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - ./conf/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+      - ./logs/elasticsearch:/usr/share/elasticsearch/logs
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD:-}
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+    ports:
+      - "5601:5601"
+    volumes:
+      - ./conf/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+      - ./logs/kibana:/usr/share/kibana/logs
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-}
+    volumes:
+      - ./data/logstash:/usr/share/logstash/pipeline
+      - ./logs/logstash:/usr/share/logstash/logs
+    ports:
+      - "514:514/tcp" # Syslog
+      - "514:514/udp" # Syslog
+      - "5044:5044" # Beats
+      - "5000:5000/tcp" # TCP
+      - "5000:5000/udp" # UDP
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+
+networks:
+  elk:
+    driver: bridge
